@@ -14,6 +14,7 @@ class _HomePageState extends State<HomePage> {
   var tarefaRepository = TarefaRepository();
   var _Itens = <Tarefa>[];
   TextEditingController descricaoControle = TextEditingController();
+  var naoMarcados = false;
 
   @override
   void initState() {
@@ -24,6 +25,12 @@ class _HomePageState extends State<HomePage> {
 
   void obterTarefa() async {
     _Itens = await tarefaRepository.listar();
+    if (naoMarcados) {
+      _Itens = await tarefaRepository.listarNaoConcluida();
+    } else {
+      _Itens = await tarefaRepository.listar();
+    }
+    setState(() {});
   }
 
   @override
@@ -31,6 +38,8 @@ class _HomePageState extends State<HomePage> {
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
+          elevation: 8,
+          shadowColor: Colors.amber,
           title: Text(
             "Lista de Compras",
             style: GoogleFonts.arvo(
@@ -41,6 +50,7 @@ class _HomePageState extends State<HomePage> {
           backgroundColor: const Color.fromARGB(255, 13, 150, 138), //cor do app
         ),
         floatingActionButton: FloatingActionButton(
+            elevation: 8,
             child: const Icon(Icons.add),
             onPressed: () {
               descricaoControle.text = " ";
@@ -60,6 +70,7 @@ class _HomePageState extends State<HomePage> {
                               onPressed: () async {
                                 await tarefaRepository.adicionar(
                                     Tarefa(descricaoControle.text, false));
+                                // ignore: use_build_context_synchronously
                                 Navigator.pop(context);
                                 setState(() {});
                               },
@@ -67,14 +78,62 @@ class _HomePageState extends State<HomePage> {
                         ]);
                   });
             }),
-        body: ListView.builder(
-            itemCount: _Itens.length,
-            itemBuilder: (BuildContext bc, int index) {
-              var tarefa = _Itens[index];
-              return Container(
-                child: Text(tarefa.getDescricao()),
-              );
-            }),
+        body: Container(
+          margin: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Apenas os que Faltam",
+                    style: TextStyle(fontSize: 15),
+                  ),
+                  Transform.scale(
+                    scale: 0.8,
+                    child: Switch(
+                        activeColor: Colors.amber,
+                        value: naoMarcados,
+                        onChanged: (bool value) {
+                          naoMarcados = value;
+                          obterTarefa();
+                        }),
+                  )
+                ],
+              ),
+              Expanded(
+                child: ListView.builder(
+                    itemCount: _Itens.length,
+                    itemBuilder: (BuildContext bc, int index) {
+                      var tarefa = _Itens[index];
+                      return Dismissible(
+                        onDismissed: (DismissDirection dismissDirection) {
+                          tarefaRepository.remover(tarefa.id);
+                          obterTarefa();
+                        },
+                        key: Key(tarefa.id),
+                        child: ListTile(
+                          title: Text(tarefa.descricao,
+                              style: const TextStyle(fontSize: 22)),
+                          trailing: Switch(
+                              activeThumbImage: const NetworkImage(
+                                  'https://cdn-icons-png.flaticon.com/512/3144/3144456.png'),
+                              value: tarefa.concluido,
+                              onChanged: (bool value) async {
+                                await tarefaRepository.alterar(
+                                    tarefa.id, value);
+                                obterTarefa();
+                              }),
+                        ),
+                      );
+                      // return Container(
+                      //   child: Text(tarefa.getDescricao()),
+                      // );
+                    }),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
